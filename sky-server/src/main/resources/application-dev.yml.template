@@ -1,0 +1,11 @@
+sky:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    host: localhost
+    port: 3306
+    database: sky_take_out
+    username: root
+    password: 你的数据库密码
+
+# 注意：实际使用时请复制此文件为 application-dev.yml 并填写真实配置
+# 不要将包含真实密码的文件提交到代码仓库

@@ -7,7 +7,11 @@ import com.aliyun.oss.OSSException;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+
 import java.io.ByteArrayInputStream;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 @Data
 @AllArgsConstructor
@@ -22,47 +26,47 @@ public class AliOssUtil {
     /**
      * 文件上传
      *
-     * @param bytes
-     * @param objectName
-     * @return
+     * @param bytes 文件字节数组
+     * @param objectName 原始文件名
+     * @return 文件访问URL
      */
     public String upload(byte[] bytes, String objectName) {
+
+        // 获取当前系统日期的字符串，格式为 yyyy/MM
+        String dir = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM"));
+        // 生成一个新的不重复的文件名
+        String extension = objectName.substring(objectName.lastIndexOf("."));
+        String newFileName = UUID.randomUUID().toString() + extension;
+        String finalObjectName = dir + "/" + newFileName;
 
         // 创建OSSClient实例。
         OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
 
         try {
             // 创建PutObject请求。
-            ossClient.putObject(bucketName, objectName, new ByteArrayInputStream(bytes));
+            ossClient.putObject(bucketName, finalObjectName, new ByteArrayInputStream(bytes));
         } catch (OSSException oe) {
-            System.out.println("Caught an OSSException, which means your request made it to OSS, "
-                    + "but was rejected with an error response for some reason.");
-            System.out.println("Error Message:" + oe.getErrorMessage());
-            System.out.println("Error Code:" + oe.getErrorCode());
-            System.out.println("Request ID:" + oe.getRequestId());
-            System.out.println("Host ID:" + oe.getHostId());
+            log.error("OSS服务异常: {}", oe.getErrorMessage(), oe);
+            throw new RuntimeException("文件上传失败: " + oe.getErrorMessage());
         } catch (ClientException ce) {
-            System.out.println("Caught an ClientException, which means the client encountered "
-                    + "a serious internal problem while trying to communicate with OSS, "
-                    + "such as not being able to access the network.");
-            System.out.println("Error Message:" + ce.getMessage());
+            log.error("客户端异常: {}", ce.getMessage(), ce);
+            throw new RuntimeException("文件上传失败: " + ce.getMessage());
         } finally {
             if (ossClient != null) {
                 ossClient.shutdown();
             }
         }
 
-        //文件访问路径规则 https://BucketName.Endpoint/ObjectName
-        StringBuilder stringBuilder = new StringBuilder("https://");
-        stringBuilder
-                .append(bucketName)
-                .append(".")
-                .append(endpoint)
-                .append("/")
-                .append(objectName);
+        // 文件访问路径规则 https://BucketName.Endpoint/ObjectName
+        // 从 endpoint 中提取协议和域名，例如: https://oss-cn-beijing.aliyuncs.com
+        String[] parts = endpoint.split("//");
+        String protocol = parts[0]; // https:
+        String domain = parts[1];   // oss-cn-beijing.aliyuncs.com
+        
+        String url = protocol + "//" + bucketName + "." + domain + "/" + finalObjectName;
 
-        log.info("文件上传到:{}", stringBuilder.toString());
+        log.info("文件上传到:{}", url);
 
-        return stringBuilder.toString();
+        return url;
     }
 }
